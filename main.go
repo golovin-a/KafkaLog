@@ -25,26 +25,28 @@ type Error struct {
 }
 
 type ErrorHandler struct {
-	producer sarama.SyncProducer
-	topic    string
+	producer    sarama.SyncProducer
+	topic       string
+	serviceName string
 }
 
-func NewErrorHandler(brokers []string, topic string) (*ErrorHandler, error) {
+func NewErrorHandler(brokers []string, topic string, serviceName string) (*ErrorHandler, error) {
 	producer, err := sarama.NewSyncProducer(brokers, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	return &ErrorHandler{
-		producer: producer,
-		topic:    topic,
+		producer:    producer,
+		topic:       topic,
+		serviceName: serviceName,
 	}, nil
 }
 
-func (eh *ErrorHandler) HandleError(err error, r *http.Request, serviceName string) {
+func (eh *ErrorHandler) HandleError(err error, r *http.Request) {
 	_, filename, line, _ := runtime.Caller(1)
 	file := filename + ":" + strconv.Itoa(line)
-	errorData := getLogData(err, r, file, serviceName)
+	errorData := getLogData(err, r, file, eh.serviceName)
 	errorJSON, _ := json.Marshal(errorData)
 
 	message := &sarama.ProducerMessage{
