@@ -1,4 +1,4 @@
-module KafkaLog
+module github.com/golovin-a/KafkaLog
 
 go 1.21.6
 
