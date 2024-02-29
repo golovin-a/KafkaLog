@@ -2,8 +2,7 @@ package KafkaLog
 
 import (
 	"encoding/json"
-	"github.com/IBM/sarama"
-	"log"
+	"github.com/golovin-a/KafkaLog/tools/kafka"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -24,48 +23,12 @@ type Error struct {
 	UserRegion    string `json:"user_region"`
 }
 
-type ErrorHandler struct {
-	producer    sarama.SyncProducer
-	topic       string
-	serviceName string
-}
-
-func NewErrorHandler(brokers []string, topic string, serviceName string) (*ErrorHandler, error) {
-	producer, err := sarama.NewSyncProducer(brokers, nil)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	return &ErrorHandler{
-		producer:    producer,
-		topic:       topic,
-		serviceName: serviceName,
-	}, nil
-}
-
-func (eh *ErrorHandler) HandleError(err error, r *http.Request) {
+func HandleError(eh *kafka.Config, err error, r *http.Request) {
 	_, filename, line, _ := runtime.Caller(1)
 	file := filename + ":" + strconv.Itoa(line)
-	errorData := getLogData(err, r, file, eh.serviceName)
+	errorData := getLogData(err, r, file, *eh.ServiceName)
 	errorJSON, _ := json.Marshal(errorData)
-
-	message := &sarama.ProducerMessage{
-		Topic: eh.topic,
-		Value: sarama.StringEncoder(errorJSON),
-	}
-
-	partition, offset, err := eh.producer.SendMessage(message)
-	if err != nil {
-		log.Printf("FAILED to send message: %s\n", err)
-	} else {
-		log.Printf("> message sent to partition %d at offset %d\n", partition, offset)
-	}
-}
-
-func (eh *ErrorHandler) Close() {
-	if err := eh.producer.Close(); err != nil {
-		log.Printf("failed to close Kafka producer: %v\n", err)
-	}
+	eh.Send(errorJSON)
 }
 
 func getLogData(err error, r *http.Request, file string, serviceName string) *Error {
